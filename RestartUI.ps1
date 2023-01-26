@@ -19,6 +19,25 @@ public class FormWithoutX : Form {
 }
 '@ -ReferencedAssemblies System.Windows.Forms
 
+$15Minutes = [timespan] '0:15'
+
+# Start time, based on now 
+$rawStartTime = Get-Date
+$startTime = [datetime]::new(
+  [long] [Math]::Ceiling($rawStartTime.Ticks / $15Minutes.Ticks) * $15Minutes.Ticks,
+  $rawStartTime.Kind
+)
+
+$endTime = $startTime.AddHours(5)
+
+# Create an array of time-of-day strings in 15-minute intervals 
+# between the start and end time, inclusively:
+[string[]] $timeStrings = 
+  while ($startTime -le $endTime) {
+    $startTime.ToString('h:mm tt') # format and output
+    $startTime += $15Minutes
+  }
+
 $PostponeCounter = 0
 
 # Create a new form
@@ -30,9 +49,12 @@ $ConfirmForm                    = [FormWithoutX]::new()
 # Create postpone form
 $PostponeForm                   = [FormWithoutX]::new()
 
+# Create set time form
+$SetTimeForm                   = [FormWithoutX]::new()
+
 #$Icon				            = New-Object system.drawing.icon ("C:\Users\Zach S\AppData\Local\Microsoft\Office\SolutionPackages\9641fb159bad7fd251f0672bc0c49dc2\PackageResources\win32\favicon.ico")
 $ConfirmForm.ClientSize         = '540,150'
-$ConfirmForm.text               = "AIS - Restart Confirmation"
+$ConfirmForm.text               = "Adaptive Information Systems - Restart Confirmation"
 $ConfirmForm.BackColor          = "#ffffff"
 #$ConfirmForm.Icon		        = $Icon
 $ConfirmForm.AutoScale          = $true
@@ -44,6 +66,12 @@ $RestartForm.text               = "Adaptive Information Systems - Restart Notice
 $RestartForm.BackColor          = "#ffffff"
 #$RestartForm.Icon		        = $Icon
 $RestartForm.AutoScale          = $true
+
+$SetTimeForm.ClientSize         = '500,300'
+$SetTimeForm.text               = "Adaptive Information Systems - Restart Time Select"
+$SetTimeForm.BackColor          = "#ffffff"
+#$SetTimeForm.Icon		        = $Icon
+$SetTimeForm.AutoScale          = $true
 
 $PostponeForm.ClientSize         = '500,300'
 $PostponeForm.text               = "Adaptive Information Systems - Postpone"
@@ -107,7 +135,7 @@ $CDescription.location            = New-Object System.Drawing.Point(20,50)
 $CDescription.Font                = 'Microsoft Sans Serif,10'
 
 $PDescription                     = New-Object system.Windows.Forms.Label
-$PDescription.text                = "Restart prompt will reappear after the selected amount of time"
+$PDescription.text                = "Are you ready to restart now?"
 $PDescription.AutoSize            = $true
 $PDescription.width               = 550
 $PDescription.height              = 50
@@ -121,6 +149,14 @@ $PaDescription.width               = 550
 $PaDescription.height              = 50
 $PaDescription.location            = New-Object System.Drawing.Point(20,100)
 $PaDescription.Font                = 'Microsoft Sans Serif,10'
+
+$TDescription                     = New-Object system.Windows.Forms.Label
+$TDescription.text                = "Select a time to restart the computer. A confirmation will appear before actual restart."
+$TDescription.AutoSize            = $false
+$TDescription.width               = 450
+$TDescription.height              = 50
+$TDescription.location            = New-Object System.Drawing.Point(20,50)
+$TDescription.Font                = 'Microsoft Sans Serif,10'
 
 $RestartBtn                   = New-Object system.Windows.Forms.Button
 $RestartBtn.BackColor         = "#a4ba67"
@@ -136,6 +172,7 @@ $ConfirmBtn.BackColor         = "#a4ba67"
 $ConfirmBtn.text              = "Confirm"
 $ConfirmBtn.width             = 90
 $ConfirmBtn.height            = 30
+$ConfirmBtn.Enabled           = $false
 $ConfirmBtn.location          = New-Object System.Drawing.Point(170,110)
 $ConfirmBtn.Font              = 'Microsoft Sans Serif,10'
 $ConfirmBtn.ForeColor         = "#ffffff"
@@ -149,14 +186,20 @@ $ConfirmBackBtn.location          = New-Object System.Drawing.Point(270,110)
 $ConfirmBackBtn.Font              = 'Microsoft Sans Serif,10'
 $ConfirmBackBtn.ForeColor         = "#000000"
 
-$PostponeBackBtn                   = New-Object system.Windows.Forms.Button
-$PostponeBackBtn.BackColor         = "#ffffff"
-$PostponeBackBtn.text              = "Back"
-$PostponeBackBtn.width             = 90
-$PostponeBackBtn.height            = 30
-$PostponeBackBtn.location          = New-Object System.Drawing.Point(50,250)
-$PostponeBackBtn.Font              = 'Microsoft Sans Serif,10'
-$PostponeBackBtn.ForeColor         = "#000000"
+# Why is this button object level with the Postpone button even though y = 240 here and y= 250 there, world may never know
+$ConfirmBackPostBtn                   = New-Object system.Windows.Forms.Button
+$ConfirmBackPostBtn.BackColor         = "#ffffff"
+$ConfirmBackPostBtn.text              = "Restart"
+$ConfirmBackPostBtn.width             = 90
+$ConfirmBackPostBtn.height            = 30
+$ConfirmBackPostBtn.location          = New-Object System.Drawing.Point(270,240) 
+$ConfirmBackPostBtn.Font              = 'Microsoft Sans Serif,10'
+$ConfirmBackPostBtn.ForeColor         = "#000000"
+
+$ConfirmCheckbox                      = New-Object System.Windows.Forms.CheckBox
+$ConfirmCheckbox.Text                 = "I'm ready"
+$ConfirmCheckbox.Checked              = $false
+$ConfirmCheckbox.location             = New-Object System.Drawing.Point(30,80)
 
 $PostponeBtn                       = New-Object system.Windows.Forms.Button
 $PostponeBtn.BackColor             = "#ffffff"
@@ -190,6 +233,24 @@ $PConfirmBtn.location              = New-Object System.Drawing.Point(370,240)
 $PConfirmBtn.Font                  = 'Microsoft Sans Serif,10'
 $PConfirmBtn.ForeColor             = "#000"
 
+$TimePicker =  New-Object system.Windows.Forms.ComboBox
+$TimePicker.Width = 90
+
+@($timeStrings) | ForEach-Object {[void] $TimePicker.Items.Add($_)}
+
+$TimePicker.SelectedIndex          = 0
+$TimePicker.Font                   = 'Microsoft Sans Serif,10'
+$TimePicker.Location               = New-Object System.Drawing.Point(370,200)
+$TimePicker.DropdownStyle          = [System.Windows.Forms.ComboBoxStyle]::DropDownList;
+
+$TConfirmBtn                       = New-Object system.Windows.Forms.Button
+$TConfirmBtn.BackColor             = "#ffffff"
+$TConfirmBtn.text                  = "Set Time"
+$TConfirmBtn.width                 = 90
+$TConfirmBtn.height                = 30
+$TConfirmBtn.location              = New-Object System.Drawing.Point(370,240)
+$TConfirmBtn.Font                  = 'Microsoft Sans Serif,10'
+$TConfirmBtn.ForeColor             = "#000"
 
 # ADD OTHER ELEMENTS ABOVE THIS LINE
 
@@ -198,46 +259,53 @@ $RestartForm.controls.AddRange(@($Titel,$Description,$RestartBtn, $PostponeBtn))
 
 function PostponeClick {
     [void]$RestartForm.Hide()
-    $PostponeForm.Controls.AddRange(@($PTitel, $PDescription, $PaDescription, $PostponeBackBtn, $PostponeAmt, $PConfirmBtn))
+    $PostponeForm.Controls.AddRange(@($PTitel, $PDescription, $PaDescription, $ConfirmBackPostBtn, $PostponeAmt, $PConfirmBtn))
     [void]$PostponeForm.ShowDialog()
+}
+
+function SetTimeClick {
+    [void]$RestartForm.Hide()
+    $SetTimeForm.controls.AddRange(@($TDescription, $PTitle, $TimePicker, $TConfirmBtn))
+    [void]$SetTimeForm.ShowDialog()
 }
 
 function RestartClick {
     [void]$RestartForm.Hide()
-    $ConfirmForm.controls.AddRange(@($ConfirmBtn, $ConfirmBackBtn, $CDescription))
+    $ConfirmForm.controls.AddRange(@($ConfirmBtn, $ConfirmBackBtn, $CDescription, $ConfirmCheckbox))
     [void]$ConfirmForm.ShowDialog()
 }
 
 function ConfirmClick {
     [void]$ConfirmForm.Close()
-    Restart-Computer -Force
+    $PostponeCounter | Out-File -FilePath C:\attempts.txt
+    Restart-Computer -Force -WhatIf
 }
 
 # Handles dropdown selection, can add more, as values are decided on
 
 function PConfirmClick {
-    if ($PostponeAmt.SelectedValue = "15 minutes") {
+    if ($PostponeAmt.SelectedItem -eq "15 minutes") {
         [void]$PostponeForm.Hide()
         $sleep = 15 * 60
         Increment
         Start-Sleep -Seconds $sleep
         [void]$PostponeForm.Show()
     }
-    elseif ($PostponeAmt.SelectedValue = "30 minutes") {
+    elseif ($PostponeAmt.SelectedItem -eq "30 minutes") {
         [void]$PostponeForm.Hide()
         $sleep = 30 * 60
         Increment
         Start-Sleep -Seconds $sleep
         [void]$PostponeForm.Show()
     }
-    elseif ($PostponeAmt.SelectedValue = "45 minutes") {
+    elseif ($PostponeAmt.SelectedItem -eq "45 minutes") {
         [void]$PostponeForm.Hide()
         $sleep = 45 * 60
         Increment
         Start-Sleep -Seconds $sleep
         [void]$PostponeForm.Show()
     }
-    elseif ($PostponeAmt.SelectedValue = "1 hour") {
+    elseif ($PostponeAmt.SelectedItem -eq "1 hour") {
         [void]$PostponeForm.Hide()
         $sleep = 60 * 60
         Increment
@@ -246,16 +314,27 @@ function PConfirmClick {
     }
 }
 
+function TConfirmClick {
+    # Checks seconds before selected restart time \\ Write-Host (New-TimeSpan -End ([datetime]::ParseExact($TimePicker.SelectedItem, "h:mm tt", $null))).TotalSeconds
+    [void]$SetTimeForm.Hide()
+    (New-TimeSpan -End ([datetime]::ParseExact($TimePicker.SelectedItem, "h:mm tt", $null))).TotalSeconds | Sleep
+    Increment
+    RestartClick
+}
+
 function ConfirmBackClick {
     [void]$PostponeForm.Hide()
     [void]$ConfirmForm.Hide()
-    [void]$RestartForm.Show()
+    [void]$RestartForm.Hide()
+    [void]$SetTimeForm.Hide()
+    PostponeClick
 }
 
-function PostponeBackClick {
+function ConfirmBackPostClick {
     [void]$PostponeForm.Hide()
-    [void]$ConfirmForm.Hide()
-    [void]$RestartForm.Show()
+    [void]$ConfirmForm.Show()
+    [void]$RestartForm.Hide()
+    [void]$SetTimeForm.Hide()
 }
 
 function Increment {
@@ -263,21 +342,34 @@ function Increment {
     $PaDescription.Text = "Amount of times restart has been postponed: "+$Script:PostponeCounter
 }
 
+function test-checkbox-value {
+    if ($ConfirmCheckbox.Checked) {
+        $ConfirmBtn.Enabled = $true
+    } else {
+        $ConfirmBtn.Enabled = $false
+    }
+}
+
 $ConfirmBtn.Add_Click({ConfirmClick})
 
 $RestartBtn.Add_Click({RestartClick})
 
-$PostponeBtn.Add_Click({PostponeClick})
+$PostponeBtn.Add_Click({SetTimeClick})
 
 $PConfirmBtn.Add_Click({PConfirmClick})
 
 $ConfirmBackBtn.Add_Click({ConfirmBackClick})
 
-$PostponeBackBtn.Add_Click({PostponeBackClick})
+$ConfirmBackPostBtn.Add_Click({ConfirmBackPostClick})
+
+$TConfirmBtn.Add_Click({TConfirmClick})
+
+$ConfirmCheckbox.Add_CheckedChanged({test-checkbox-value})
 
 # THIS SHOULD BE AT THE END OF YOUR SCRIPT FOR NOW
 # Display the form
 if ($r.Contains("True")) {
+    
     [void]$RestartForm.ShowDialog()
 }
 else {
