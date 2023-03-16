@@ -120,13 +120,18 @@ try {
         $connParams.Credential = $Credential
     }
     
+    $pass = ConvertTo-SecureString "" -AsPlainText -Force
+    $cred = New-Object System.Management.Automation.PSCredential ($user, $pass)
+
+    #New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord
+
     $output = @{
         ComputerName    = $myname
         IsPendingReboot = $false
     }
     
     echo $myname
-    $psRemotingSession = New-PSSession -ComputerName $myname 
+    $psRemotingSession = New-PSSession -ComputerName $myname -Credential $cred
     
     if (-not ($output.IsPendingReboot = Invoke-Command -Session $psRemotingSession -ScriptBlock $scriptBlock)) {
         $output.IsPendingReboot = $false
